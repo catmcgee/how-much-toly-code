@@ -10,7 +10,7 @@ PARALLEL="${PARALLEL:-8}"
 # Pattern matches Toly across his various commit identities. Run against the
 # `author` line of `git blame --line-porcelain` (NOT `author-mail`, since some
 # of his commits use co-author or different emails over the years).
-AUTHOR_PATTERN='^author Anatoly[ -]?Yakovenko'
+AUTHOR_PATTERN='^author [Aa]natoly[ -]?[Yy]akovenko'
 
 if [ ! -d "$REPO_DIR/.git" ]; then
   rm -rf "$REPO_DIR"

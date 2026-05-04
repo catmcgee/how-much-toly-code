@@ -21,7 +21,7 @@ const PARALLEL = Number(process.env.PARALLEL ?? "8");
 const INTERVAL_MONTHS = Number(process.env.INTERVAL_MONTHS ?? "3");
 const START = process.env.START ?? "2018-01-01";
 
-const AUTHOR_RE = /^author Anatoly[ -]?Yakovenko/;
+const AUTHOR_RE = /^author Anatoly[ -]?Yakovenko/i;
 const SKIP_RE =
   /(?:^|\/)(Cargo\.lock|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$|\.(?:png|jpg|jpeg|gif|webp|ico|pdf|zip|gz|tar|wasm|so|dylib|dll|exe)$/i;
 
