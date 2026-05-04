@@ -1,0 +1,84 @@
+name: backfill
+
+# Manual one-time backfill of the historical timeline.
+# GH Actions caps each job at 6h; the script is resumable, so if a single run
+# isn't enough, just dispatch this workflow again — it picks up where it left
+# off.
+
+on:
+  workflow_dispatch:
+    inputs:
+      interval_months:
+        description: "Months between samples (1 = monthly, 3 = quarterly, 6 = biannual)"
+        default: "3"
+        type: string
+      start:
+        description: "Earliest sample date (YYYY-MM-DD)"
+        default: "2018-01-01"
+        type: string
+      parallel:
+        description: "Concurrent blame workers"
+        default: "8"
+        type: string
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    # Stay just under GH's 6h hard limit so the job ends cleanly with time to
+    # commit progress and write the cache.
+    timeout-minutes: 340
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Cache the full agave clone between dispatches. Multi-GB but well under
+      # the 10GB per-repo cache budget, and saves a re-clone (~2-5 min) every
+      # time the workflow resumes.
+      - name: Cache agave clone
+        uses: actions/cache@v4
+        with:
+          path: /tmp/agave-backfill
+          key: agave-fullclone-${{ github.run_id }}
+          restore-keys: |
+            agave-fullclone-
+
+      - name: Run backfill (time-capped, resumable)
+        env:
+          INTERVAL_MONTHS: ${{ inputs.interval_months }}
+          START: ${{ inputs.start }}
+          PARALLEL: ${{ inputs.parallel }}
+        # Cap script runtime at 5h20m, leaving 40 min headroom for commit
+        # and cache save. `|| true` so a SIGTERM from `timeout` doesn't fail
+        # the step — partial progress is fine, the script writes incrementally.
+        run: |
+          timeout 19200 node scripts/backfill.mjs || true
+
+      - name: Commit progress
+        run: |
+          if git diff --quiet -- data/snapshots.json; then
+            echo "no progress to commit"
+            exit 0
+          fi
+          git config user.name "backfill-bot"
+          git config user.email "backfill-bot@users.noreply.github.com"
+          git add data/snapshots.json
+          git commit -m "backfill: $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
+
+      - name: Status
+        run: |
+          total=$(jq 'length' data/snapshots.json)
+          first=$(jq -r '.[0].date' data/snapshots.json)
+          last=$(jq -r '.[-1].date' data/snapshots.json)
+          today=$(date -u +%Y-%m-%d)
+          echo "snapshots: $total, range: $first → $last"
+          if [ "$last" = "$today" ]; then
+            echo "✓ backfill complete (today is the most recent sample)"
+          else
+            echo "⚠ not yet complete — re-dispatch this workflow to continue"
+          fi
