@@ -12,11 +12,14 @@ PARALLEL="${PARALLEL:-8}"
 # of his commits use co-author or different emails over the years).
 AUTHOR_PATTERN='^author [Aa]natoly[ -]?[Yy]akovenko'
 
+# Full history clone is required: `git blame` walks the commit graph to find
+# the original author of each line, so a shallow clone attributes every line
+# to the most recent commit and the count comes back as 0.
 if [ ! -d "$REPO_DIR/.git" ]; then
   rm -rf "$REPO_DIR"
-  git clone --depth=1 --filter=blob:none "$REPO_URL" "$REPO_DIR" >&2
+  git clone "$REPO_URL" "$REPO_DIR" >&2
 else
-  git -C "$REPO_DIR" fetch --depth=1 origin >&2
+  git -C "$REPO_DIR" fetch origin >&2
   git -C "$REPO_DIR" reset --hard origin/HEAD >&2
 fi
 
